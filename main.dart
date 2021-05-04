@@ -1,122 +1,142 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:camera/camera.dart';
+import 'package:tez1fl/camera_screen.dart';
+import 'package:tez1fl/assistantMethods.dart';
+import 'package:tez1fl/requestAssistant.dart';
+import 'package:oktoast/oktoast.dart';
+import 'package:http/http.dart';
 
+List<CameraDescription> cameras;
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  runApp(MyApp());
+WidgetsFlutterBinding.ensureInitialized();
+cameras = await availableCameras();
+runApp(MyApp());
 }
-
 class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Basic Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      home: MyHomePage(title: 'new Flutter App'),
-    );
-  }
+@override
+Widget build(BuildContext context) {
+return OKToast(
+child: MaterialApp(
+title: 'Flutter İzinler',
+theme: ThemeData(
+primarySwatch: Colors.deepPurple,visualDensity: VisualDensity.adaptivePlatformDensity,
+),
+home: MyHomePage(title: 'Flutter İzinler'),
+),
+);
 }
-
+}
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  final String title;
-
-  @override
-  _MyHomePageState createState() => _MyHomePageState();
+MyHomePage({Key key, this.title}) : super(key: key);
+final String title;
+@override
+_MyHomePageState createState() => _MyHomePageState();
 }
-
 class _MyHomePageState extends State<MyHomePage> {
-  var url;
-  Widget _buildlistItem(BuildContext context, DocumentSnapshot document) {
-    void showImage() async {
-      final ref = FirebaseStorage.instance.ref().child('erkekyuz.png'); //This is my example image, just change it as you will
-      url = await ref.getDownloadURL();
-    }
-    showImage(); //All this is for the image I will use below.
-
-    String mezunD;
-    if (document.data()['mezunDurumu'] == false) {
-      mezunD = "Mezun Değil";
-    }
-    if (document.data()['mezunDurumu'] == true) {
-      mezunD = "Mezun";
-    }
-    String yasString = (document.data()['yas']).toString();
-	//this is because the table only accepts string, so therefore I change it to string.
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Table(
-        border: TableBorder.all(),
-        children: [
-          TableRow(children: [
-            Text("Ad Soyad:  "),
-            Text(
-              document.data()['adSoyad'],
-              textAlign: TextAlign.center,
-            ),
-          ]),
-          TableRow(children: [
-            Text("Yaş:  "),
-            Text(
-              yasString,
-              textAlign: TextAlign.center,
-            ),
-          ]),
-          TableRow(children: [
-            Text("Doğum Tarihi:  "),
-            Text(
-              document.data()['dogumTarihi'],
-              textAlign: TextAlign.center,
-            ),
-          ]),
-          TableRow(children: [
-            Text("Mezun Durumu:  "),
-            Text(
-              mezunD,
-              textAlign: TextAlign.center,
-            ),
-          ]),
-          TableRow(children: [
-            Text(
-              "Fotoğraf:  ",
-            ),
-            Image.network(
-              url,
-              width: 50,
-              height: 50,
-            ),
-          ]),
-        ],
-      ),
-    );
-  }
-
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Öğrenci Durumu"),
-      ),
-      body: StreamBuilder(
-          stream: FirebaseFirestore.instance.collection('tablolar').snapshots(),
-          //tablolar is the table name you created.
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const Text('Loading...');
-            return ListView.builder(
-              itemExtent: 100.0,
-              itemCount: snapshot.data.docs.length,
-              itemBuilder: (context, index) =>
-                  _buildlistItem(context, snapshot.data.docs[index]),
-            );
-          }),
-    );
-  }
+int _counter = 0;
+void _incrementCounter() {
+setState(() {
+_counter++;
+});
+}
+openCamera() {
+Navigator.push(
+context,
+MaterialPageRoute(
+builder: (context) => CameraScreen(
+camera: cameras.first,
+),
+),
+);
+}
+String _locationMessage = "";
+Future<void> yeriGetir() async {
+final position = await Geolocator()
+.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);print(position);
+setState(() {
+_locationMessage = "${position.latitude}, ${position.longitude}";
+String address = assistantMethods.searchCoordinateAddress(position);
+print("This is your Address :: " + address);
+});
+}
+izinKontrol_Lokasyon() async {
+// LOKASYON FONKSİYONU BURADADIR.
+var locationStatus = await Permission.location.status;
+print(locationStatus);
+if (!locationStatus.isGranted) await Permission.location.request();
+//showToast(_locationMessage, position: ToastPosition.bottom);
+}
+checkallpermission_opencamera() async {
+Map<Permission, PermissionStatus> statuses = await [
+Permission.camera,
+Permission.microphone,
+].request();
+if (statuses[Permission.camera].isGranted) {
+if (statuses[Permission.microphone].isGranted) {
+openCamera();
+} else {
+showToast("Kamera mikrofonunuza erişmek istiyor, lütfen izin verin.",
+position: ToastPosition.bottom);
+}
+} else {
+showToast("Kamerayı kullanabilmek için lütfen izin verin.",
+position: ToastPosition.bottom);
+}
+}
+checkpermission_opencamera() async {
+var cameraStatus = await Permission.camera.status;
+var microphoneStatus = await Permission.microphone.status;print(cameraStatus);
+print(microphoneStatus);
+if (!cameraStatus.isGranted) await Permission.camera.request();
+if (!microphoneStatus.isGranted) await Permission.microphone.request();
+if (await Permission.camera.isGranted) {
+if (await Permission.microphone.isGranted) {
+openCamera();
+} else {
+showToast("Kamera izni gerekiyor, lütfen izin verin.",
+position: ToastPosition.bottom);
+}
+} else {
+showToast("Kamerayı kullanmak için lütfen izin verin.",
+position: ToastPosition.bottom);
+}
+}
+@override
+Widget build(BuildContext context) {
+return Scaffold(
+appBar: AppBar(
+title: Text(widget.title),
+),
+body: Center(
+child: Column(
+mainAxisAlignment: MainAxisAlignment.center,
+children: <Widget>[
+Container(
+child: IconButton(
+onPressed: checkpermission_opencamera,
+icon: Icon(Icons.camera),
+iconSize: 42,
+color: Colors.white,
+),
+color: Colors.amber,
+width: MediaQuery.of(context).size.width,
+height: (MediaQuery.of(context).size.height - 80) / 2,),
+Text("Lokasyonunuz şudur: " + address),
+Container(
+child: IconButton(
+onPressed: () => {izinKontrol_Lokasyon, yeriGetir()},
+icon: Icon(Icons.location_city),
+iconSize: 42,
+color: Colors.white),
+color: Colors.deepPurple,
+width: MediaQuery.of(context).size.width,
+height: (MediaQuery.of(context).size.height - 80) / 2,
+),
+],
+),
+) // This trailing comma makes auto-formatting nicer for build methods.
+);
+}
 }
