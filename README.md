@@ -7,7 +7,7 @@ An app that shows some data from firebase storage image and some firestore text 
 You need to create a project in the google cloud firebase. That is for only FIRESTORE not REALTIME DATABASE, and its test database. You can create firebase app from here : https://firebase.google.com/
 
 
-I can't add the whole project but it's too big. Simply, just create new flutter project with 
+I can't add the whole project since it's too big. Simply, just create new flutter project with:
 
 
 flutter create projectName
